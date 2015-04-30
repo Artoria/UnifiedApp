@@ -1,5 +1,6 @@
 require "ua/version"
 require 'erb'
+require 'ostruct'
 module Ua
   module Commands
   end
@@ -52,35 +53,41 @@ module Ua
         end
       end
       
-      
-      class UAClass
-        def initialize(bl, *ar)
-          @ar = ar.map{|x| x.to_sym}
-          @bl = bl
-        end
-        def method_missing(*a, &b)
-          prototype.send(*a, &b)
-        end
-        def prototype
-          @struct = Struct.new(*@ar)
-          @proto ||= @struct.new
-        end
-        def copy
-          r = prototype
-          @struct.new(*r)
-        end
-        def render
-          @bl.call self
-        end
-        def erb(str)
-          ERB.new(str).result(binding)
-        end
+      module UAClass
       end
+      
+      def make_uaclass(a, *ar, &block)
+        klass = Class.new(OpenStruct) do
+          include UAClass
+          define_method(:classid) do
+            a
+          end
+          define_method(:prototype) do
+            klass
+          end
+          define_method(:erb) do |text|
+            ERB.new(text).result(binding)
+          end
+          define_method(:render) do 
+            erb instance_exec &block
+          end
+        end 
+        x = klass.new
+        klass.const_set :Singleton_, x
+        x
+      end
+     
+     
       def get(a)
         @store[a]
       end
+      
+      def create(id)
+        get(id).prototype.new
+      end
+      
       def add(a, *ar, &block)
-        @store[a] = UAClass.new(block, *ar)
+        @store[a] = make_uaclass(a, *ar, &block)
       end
       
       def create(name)
@@ -113,4 +120,6 @@ module Ua
   
 end
 
-include Ua::Commands
+if !(Ua.const_get(:NoConflict) rescue nil)
+  include Ua::Commands
+end

@@ -1,12 +1,13 @@
 $: << "./lib"
 require 'ua'
+require 'cgi'
 
 set "com.ua.root", %w{
      com.ua.main
 }
 
 add "com.ua.main", "title", "charset", "content", "css", "js" do |node|
-	ERB.new(<<-'EOF').result(node.instance_eval{binding})
+	%{
 		<!doctype html>
 	    <head>
 		<title><%= title %> </title>
@@ -22,7 +23,7 @@ add "com.ua.main", "title", "charset", "content", "css", "js" do |node|
 		  <%= context(content, :html) %>
 		</body>
 		</html>
-	EOF
+	}
 end
 
 context String, :attr do |str|
@@ -30,7 +31,7 @@ context String, :attr do |str|
 end 
 
 context String, :html do |str|
-  str
+  CGI.escapeHTML str
 end 
 
 x = get "com.ua.main"
