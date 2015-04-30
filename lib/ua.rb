@@ -1,6 +1,8 @@
 require "ua/version"
-
+require 'erb'
 module Ua
+  module Commands
+  end
   class Application
       
       def initialize
@@ -21,7 +23,7 @@ module Ua
             h = i.instance_method(:uacontext) rescue nil
             return h.bind(a).call(b) if h
          }
-         raise "Can't find a handler"
+         raise "Can't find a handler #{a.class} #{b}"
       end
       
       
@@ -34,6 +36,10 @@ module Ua
 
       TOPLEVEL = "com.ua.root"      
       def go!(name = TOPLEVEL)
+         puts app(name)
+      end
+      
+      def app(name = TOPLEVEL)
         context(@store[name], :app)
       end
       
@@ -46,24 +52,65 @@ module Ua
         end
       end
       
+      
+      class UAClass
+        def initialize(bl, *ar)
+          @ar = ar.map{|x| x.to_sym}
+          @bl = bl
+        end
+        def method_missing(*a, &b)
+          prototype.send(*a, &b)
+        end
+        def prototype
+          @struct = Struct.new(*@ar)
+          @proto ||= @struct.new
+        end
+        def copy
+          r = prototype
+          @struct.new(*r)
+        end
+        def render
+          @bl.call self
+        end
+        def erb(str)
+          ERB.new(str).result(binding)
+        end
+      end
+      def get(a)
+        @store[a]
+      end
+      def add(a, *ar, &block)
+        @store[a] = UAClass.new(block, *ar)
+      end
+      
+      def create(name)
+        @store[name].copy
+      end
+      
       app = SINGLETON_APP = new
       app.context Array, :app do |arr|
-        arr.each{|x|
-          app.go!(x)
-        }
+        arr.map{|a| app.app a}.join
       end
       
       app.context String, :app do |str|
-        puts str
+        str
+      end
+      
+      app.context UAClass, :app do |klass|
+        klass.render
       end
       
       def self.export_commands(*names)
         names.each{|name|
-          (class << eval("self", TOPLEVEL_BINDING); self; end).send(:define_method, name) do |*a, &b|
+          (Commands).send(:define_method, name) do |*a, &b|
              SINGLETON_APP.send(name, *a, &b)
           end
         }
       end
-      export_commands :set, :go!, :context
+      export_commands :set, :go!, :context, :add, :create, :get
   end
+  
+  
 end
+
+include Ua::Commands
