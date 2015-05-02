@@ -56,9 +56,9 @@ module Ua
       end
       
       def tmpid
-         r = get("tmp.id") || 0
+         r = get("temp.id") || 0
          r += 1
-         set "tmp.id", r
+         set "temp.id", r
          "temp.#{r}"
       end
       
@@ -73,7 +73,7 @@ module Ua
          r.ancestors.each{|i|
             h = i.instance_method(:uacontext) rescue nil
             catch(:continue){
-              return h.bind(a).call(*c) if h
+              return h.bind(a).call(b, *c) if h
             }
          }
          raise "Can't find a handler #{a.class} #{b}"
@@ -209,16 +209,14 @@ module Ua
         u
       end
       
-      def create(id)
-        get(id).prototype.new 
+      def create(id, opt = {}, &b)
+        x = get(id).prototype.new
+        opt.each{|k, v| x.send "#{k}=", v }
+        x         
       end
       
       def add(a, *ar, &block)
         set a, make_uaclass(a, *ar, &block)
-      end
-      
-      def create(name)
-        get(name).clone
       end
       
       def self.push_app(app)

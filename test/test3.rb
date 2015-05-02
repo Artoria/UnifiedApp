@@ -59,10 +59,14 @@ class SimpleWin32Application < Ua::Application
 	end
 	
 	def button(x, y, w, h, text, msg)
-	  btn = create 'com.win32.button'
 	  @id ||= 100
 	  @id += 1
-	  btn.bound, btn.text, btn.msg, btn.id = [x, y, w, h], text, msg, @id
+	  btn = create 'com.win32.button',
+	       bound: [x, y, w, h],
+		   text:  text,
+		   msg:   msg,
+		   id:    @id
+		   
 	  append 'com.win32.buttons', btn
 	  append 'com.win32.buttonclicks', btn
 	  btn
@@ -74,8 +78,6 @@ x = SimpleWin32Application.new
 x.get('com.win32.cpp').title = "Hello world"
 x.get('com.win32.cpp').bound = [300, 200, 640, 480]
 x.button 0, 0, 24, 36, "Hello", "Clicked"
-require 'awesome_print'
-ap x.instance_eval{@store}
 x.go!
 
 __END__
