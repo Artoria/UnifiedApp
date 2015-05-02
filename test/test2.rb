@@ -8,14 +8,8 @@ class SayHelloApplication < Ua::Application
 		add "com.ua.js.main" do
 			"
 				(function(){
-					if(typeof window !== 'undefined') {
-						window.alert(<%= context(message, :js_string) %> );
-					}
 					if(typeof console !== 'undefined') {
 			    		console.log( <%= context(message, :js_string) %> );
-		    		}
-					if(typeof WScript !== 'undefined') {
-			    		WScript.Echo( <%= context(message, :js_string) %> );
 		    		}
 				})()		
 			"
