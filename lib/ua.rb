@@ -82,9 +82,9 @@ module Ua
         u = acyclic[[a, b, c]]
         return u if u
           
-        if b.respond_to?(:===) 
+        if b.respond_to?(:===)        
           if r = (b === a)
-            return(acyclic[[a,b,c]] = (r.respond_to?(:call) ? lambda{r.call(*c)} : lambda{ a }))
+            return acyclic[[a,b,c]] = (r.respond_to?(:call) ? r.call(*c) : a )
           end
         end
         ret = []
@@ -435,7 +435,7 @@ module Ua
                       :deduct, :modelhash,
                       :get_local, :set_local, :push_local, :pop_local, :delete,
                       
-                      :model, :view, :link, :forall
+                      :model, :link, :forall
                       
   end
     module Commands
@@ -448,6 +448,7 @@ module Ua
         ensure
           Ua::Application.pop
         end
+        alias view context
         alias new create
                 
       end            
