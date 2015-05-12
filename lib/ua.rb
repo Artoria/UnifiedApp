@@ -10,6 +10,7 @@ module Ua
       def initialize
          @store   = {}
          @context = {}
+         @deduct  = {}
       end
       
       def default_context
@@ -65,22 +66,79 @@ module Ua
          "#{prefix}.#{r}"
       end
       
-      def output_by_context(a, b, *c)
+      def _array_prc_to_continue(arr)
+           lambda{
+             arr.each{|prc|
+              catch(:continue){
+                return prc.call
+              }
+             }
+           }
+      end
+      
+      DeductUnit = lambda{throw :continue}
+      
+      def find_context(a, b, c, acyclic = {})
+        u = acyclic[[a, b, c]]
+        return u if u
+          
+        if b.respond_to?(:===) 
+          if r = (b === a)
+            return(acyclic[[a,b,c]] = (r.respond_to?(:call) ? lambda{r.call(*c)} : lambda{ a }))
+          end
+        end
+        ret = []
          r = a.singleton_class rescue a.class
-         r.ancestors.each{|i|
-            h = i.instance_method(:uacontext) rescue nil
-            catch(:continue){
-              return h.bind(a).call(b, *c) if h
-            }
+         if a.respond_to?(:uacontext)
+            h = a.method(:uacontext?) rescue nil
+            if !h || h.call(b, *c)
+              ret << lambda{ a.uacontext(b, *c) } 
+            end
+         end
+         r.ancestors.each{|i;h|
+            h = @context[[i, b]]     
+            ret << lambda{ a.instance_exec(a, *c, &h) } if h
          }
-         r.ancestors.each{|i|
-            h = @context[[i, b]]            
-            catch(:continue){
-              return a.instance_exec(a, *c, &h) if h
+         acyclic[[a, b, c]] = (ret == [] ? nil : _array_prc_to_continue(ret).call)
+      end
+      
+
+      def find_deduct(a, b, c, acyclic = {})
+          u = acyclic[[a, b, c]]
+          return u if u
+          ret = find_context(a, b, c, acyclic)
+          return ret if ret
+          ret = []          
+          @deduct.each{|item, prc|
+            lhs, rhs = item
+            next if rhs != b
+            lhs = Array(lhs)
+            lhs_env = lhs.map{|sym; ret|
+               ret = find_deduct(a, sym, c, acyclic)
+               return acyclic[[a, b, c]] if acyclic[[a, b, c]]
+               ret 
             }
-         }
-         puts "Can't find a handler #{a.class} #{b}"
-         raise "Can't find a handler #{a.class} #{b}"
+            next if lhs_env.index(nil)
+            u = acyclic[[a, b, c]]
+            ret << lambda{
+              args = lhs_env + c
+              prc.call(*args)
+            }
+          }
+          acyclic[[a, b, c]] = (ret == [] ? nil : _array_prc_to_continue(ret).call)
+      end
+
+      
+      def output_by_context(a, b, c, acyclic = self.class.top.controller)
+        acyclic = {} if not Hash === acyclic 
+        self.class.push ArgVoid, ArgVoid, acyclic
+        catch(:continue){
+          return find_deduct(a, b, c, acyclic)
+        }
+        
+        raise "Can't find a handler #{a.class} #{b}"
+        ensure
+          self.class.pop 
 =begin
       ensure
 
@@ -143,11 +201,20 @@ module Ua
         if block_given?
            make_context([a, b], bl)
         else
-           output_by_context(a, b, *c)
+           output_by_context(a, b, c)
         end
       end
       
-      
+      module AutoDeduct
+        def uacontext?(key, *c)
+            @opt.include?(key)
+        end
+        
+        def uacontext(key, *c)
+          return @opt[key] if @opt.include?(key)
+          throw :continue
+        end
+      end
       
       def make_uaclass(a, *ar, &block)
         autoinit = false
@@ -164,6 +231,7 @@ module Ua
         klass = Class.new(OpenStruct) do
           include UAClass
           include Enumerable
+          include AutoDeduct
           define_method(:initialize) do |*args|
           begin
               Ua::Application.push_app that
@@ -342,10 +410,32 @@ module Ua
         r
       end
       
-        
+      def deduct(a, b = nil, &block)
+        a, b = a.to_a[0] if b == nil && Hash === a
+        @deduct[[a,b]]=block
+      end
+      
+      class ModelHash
+        def initialize(opt = {})
+           @opt = opt
+        end
+        include AutoDeduct
+      end
+      
+      def modelhash(opt = {})
+        ModelHash.new(opt)
+      end
+      
+      alias model add
+      alias view context
+      alias link stream
+      alias forall deduct
       export_commands :set, :go!,    :add,               :create,
                       :get, :stream, :append,  :stream_generate,
-                      :get_local, :set_local, :push_local, :pop_local, :delete
+                      :deduct, :modelhash,
+                      :get_local, :set_local, :push_local, :pop_local, :delete,
+                      
+                      :model, :view, :link, :forall
                       
   end
     module Commands
@@ -358,10 +448,8 @@ module Ua
         ensure
           Ua::Application.pop
         end
-        alias model add
-        alias view context
-        alias link stream
-        alias new create        
+        alias new create
+                
       end            
   
 end

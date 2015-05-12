@@ -75,5 +75,11 @@ module Ua
 		  first = str[/^\s*(\S)/, 1]
 		  str.split("\n").map{|x| x.sub(/^\s*#{Regexp.escape(first)}/, "")}.join("\n")
 		end
+		
+		def method_respond_to(a)
+		  lambda{|x| 
+		    x.respond_to?(a) && lambda{|*args, &bl| x.send(a, *args, &bl) }
+		  }
+		end
 	end
 end
