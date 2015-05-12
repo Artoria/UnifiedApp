@@ -4,7 +4,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'ua/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = "ua"
+  spec.name          = "unifiedapp"
   spec.version       = Ua::VERSION
   spec.authors       = ["Artoria"]
   spec.email         = ["Artoria"]

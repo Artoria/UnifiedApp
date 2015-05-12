@@ -1,40 +1,88 @@
 
-		<!doctype html>
-	    <head>
-		<title>Hello world </title>
-		<meta http-equiv="content-type" Content="text/html; Charset=GBK" >
-		<style>
-		   body { text-decoration : underline; }
-body { font-size : 48px; }
-
-		</style>
-		<script>
-		   
-		</script>
-		</head>
-		<body>
-		   驱动器 F 中的卷是 娱乐
- 卷的序列号是 0005-4827
-
- F:\UnifiedApp\test 的目录
-
-2015/05/02  16:45    &lt;DIR&gt;          .
-2015/05/02  16:45    &lt;DIR&gt;          ..
-2015/05/02  03:28             2,048 a.db
-2015/05/02  16:43             1,015 com.win32.cpp
-2015/05/02  16:12                81 Hello.cpp
-2015/05/02  16:12            14,848 Hello.cpp.dll
-2015/05/02  16:45                 0 m.html
-2015/05/02  03:52               275 test.js
-2015/05/02  01:57             1,419 test.rb
-2015/05/02  01:57             1,155 test2.rb
-2015/05/02  16:43             2,896 test3.rb
-2015/05/02  03:49               129 test4.rb
-2015/05/02  16:12             1,069 test5.rb
-2015/05/02  16:43           135,136 win32.exe
-              12 个文件        160,071 字节
-               2 个目录 69,547,040,768 可用字节
-
-		</body>
-		</html>
+	  <!doctype html>
+	  <html>
+	  <head>
+	  <title> Hello </title>
+	  </head>
+	  <body>
+	       
+		<input id="object_11"></input>
 	
+		<div id="object_14"></div>
+	
+		<input id="object_16"></input>
+	
+		<input id="object_19"></input>
+	
+		<div id="object_22"></div>
+	
+	  
+	    <script>
+		   $scope = {}
+		   $views = {}
+		   window.update = function(a){
+			   $views[a].forEach(function(f, i){
+					f.update();   
+			   })
+		   }
+         
+		 document.querySelector("#object_11").oninput = function(){
+			 ($scope)["a"] = this.value
+			 update("a")
+		 }
+	 
+     
+      if(typeof $views["a"] === 'undefined'){
+         $views["a"] = []
+      }
+       $views["a"].push(document.querySelector("#object_14"))
+      
+		  document.querySelector("#object_14").update = function(){
+         
+         this.innerHTML = "Your name has changed to " + ($scope)["a"]+ ""
+		 }
+	 
+		 document.querySelector("#object_16").oninput = function(){
+			 ($scope)["op1"] = this.value
+			 update("op1")
+		 }
+	 
+		 document.querySelector("#object_19").oninput = function(){
+			 ($scope)["op2"] = this.value
+			 update("op2")
+		 }
+	 
+     
+      if(typeof $views["result"] === 'undefined'){
+         $views["result"] = []
+      }
+       $views["result"].push(document.querySelector("#object_22"))
+     
+      if(typeof $views["op1"] === 'undefined'){
+         $views["op1"] = []
+      }
+       $views["op1"].push(document.querySelector("#object_22"))
+     
+      if(typeof $views["op2"] === 'undefined'){
+         $views["op2"] = []
+      }
+       $views["op2"].push(document.querySelector("#object_22"))
+      
+		  document.querySelector("#object_22").update = function(){
+         
+         ($scope)["result"] = +($scope)["op1"] * +($scope)["op2"]
+         
+         this.innerHTML = "Your answer is " + ($scope)["result"]+ ""
+		 }
+	 
+		     
+	       
+    document.querySelector("#object_11").oninput()
+  
+    document.querySelector("#object_16").oninput()
+  
+    document.querySelector("#object_19").oninput()
+  
+        </script>
+	  </body>
+  

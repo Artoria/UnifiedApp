@@ -13,12 +13,13 @@ module Ua
       end
       
       def default_context
+         that = self
          context Array, :app do |arr|
             arr.map{|a| context(a, :app)}.join
          end
       
         context Apply, :app do |arr|
-           get(arr.stream_).map{|a|app a}.join
+           get(arr.stream_).map{|a|that.app a}.join
         end
         
         context String, :app do |str|
@@ -52,32 +53,37 @@ module Ua
      end
       
       def make_context(a, b)
+         a[0] = get(a[0]).class if String === a[0] && has?(a[0])
+         a[0] = a[0].class unless Module === a[0]
          @context[a] = b
       end
       
-      def tmpid
-         r = get("temp.id") || 0
+      def tmpid(prefix = "temp")
+         r = get(count = "#{prefix}.id") || 0
          r += 1
-         set "temp.id", r
-         "temp.#{r}"
+         set count, r
+         "#{prefix}.#{r}"
       end
       
       def output_by_context(a, b, *c)
          r = a.singleton_class rescue a.class
-         r.ancestors.each{|i|
-            h = @context[[i, b]]            
-            catch(:continue){
-              return h.call(a, *c) if h
-            }
-         }
          r.ancestors.each{|i|
             h = i.instance_method(:uacontext) rescue nil
             catch(:continue){
               return h.bind(a).call(b, *c) if h
             }
          }
+         r.ancestors.each{|i|
+            h = @context[[i, b]]            
+            catch(:continue){
+              return a.instance_exec(a, *c, &h) if h
+            }
+         }
+         puts "Can't find a handler #{a.class} #{b}"
          raise "Can't find a handler #{a.class} #{b}"
+=begin
       ensure
+
         if $@
           unless $@.index{|x| x=="UAException"}
             $@.unshift("UAEnd")
@@ -85,9 +91,11 @@ module Ua
           end
           l, r = $@.index("UAException"), $@.index("UAEnd")
           u = $@.slice!(l..r)
-          u[-1, 0] = "context #{a.class} #{a.respond_to?(:stream_) ? a.stream_ : nil }#{b}"
-          $@ = u + $@
+          u[-1, 0] = "context #{a.class} #{b}"
+          u += $@
+          $@.replace u
         end
+=end
       end
       
       
@@ -114,16 +122,11 @@ module Ua
          path, val = _parent(a)
          path[val] = b
          b
-      ensure
-        $@.unshift a if $@  
       end
-      
       
       def get(a)
         path, val = _parent(a)
         path[val] 
-      ensure
-        $@.unshift a if $@
       end
       
       TOPLEVEL = "com.ua.root"      
@@ -136,7 +139,7 @@ module Ua
       end
       
       
-      def context(a, b = nil, *c, &bl)
+      def context(a, b = Ua::Application.top.context, *c, &bl)
         if block_given?
            make_context([a, b], bl)
         else
@@ -160,15 +163,25 @@ module Ua
         set codename, code
         klass = Class.new(OpenStruct) do
           include UAClass
-          
+          include Enumerable
           define_method(:initialize) do |*args|
           begin
               Ua::Application.push_app that
               super(*args)
               self.stream_ = that.stream_generate
+              self.id_     = that.tmpid("object")
+              that.set self.id_, self
           ensure
-              Ua::Application.pop_app
+              Ua::Application.pop
           end
+          end
+          def mapjoin
+            map{|x| yield x}.join
+          end
+          def each
+            get(stream_).each{|x|
+              yield x
+            }
           end
           define_method(:classid) do
             a
@@ -181,7 +194,7 @@ module Ua
             Ua::Application.push_app that  
             ERB.new(text__).result(binding)
           ensure
-            Ua::Application.pop_app
+            Ua::Application.pop
           end
           end
           define_method(:render) do
@@ -189,7 +202,7 @@ module Ua
             Ua::Application.push_app that          
             erb get codename
           ensure
-            Ua::Application.pop_app
+            Ua::Application.pop
           end
           end
           define_singleton_method(:to_s) do
@@ -215,32 +228,56 @@ module Ua
         x         
       end
       
-      def add(a, *ar, &block)
+      def add(a = tmpid, *ar, &block)
         set a, make_uaclass(a, *ar, &block)
+        get a
+      end
+      
+      def delete(obj)
+        set obj.id_, nil
+      end
+      
+      module ArgVoid; end
+      
+      def self.push(app = ArgVoid, context = ArgVoid, controller = ArgVoid)
+        app     = app     == ArgVoid ? @app_stack.last.app : app
+        context = context == ArgVoid ? @app_stack.last.context : context
+        controller = controller == ArgVoid ? @app_stack.last.controller : controller
+        @app_stack.push StackFrame.new(app, context, controller)
       end
       
       def self.push_app(app)
-        @app_stack.push app
+         self.push(app)
       end
-      def self.pop_app
+      
+      
+      def self.pop
         @app_stack.pop
       end
-      def self.top_app
+      def self.top
         @app_stack.last
+      end
+      def self.top_app
+        top.app
       end
       
       app = SINGLETON_APP = new
-      @app_stack = [app]
+      
+      StackFrame = Struct.new(:app, :context, :controller)
+      @app_stack = [StackFrame.new(app, :app, eval('self', TOPLEVEL_BINDING))]
       
       def initialize
         @store   = {}
         @context = {}
+        bootup
+      end
+      
+      def bootup
         default_context
         add("com.ua.root").prototype.send :include, Ua::Application::Apply
       end
       
-      app.default_context
-      app.add("com.ua.root").prototype.send :include, Ua::Application::Apply
+      app.bootup
       
       def self.singleton
          SINGLETON_APP
@@ -263,17 +300,76 @@ module Ua
         }
       end
       
+      def has?(key)
+        get(key)
+      end
       
-      export_commands :set, :go!,    :context, :add,               :create,
-                      :get, :stream, :append,  :stream_generate, :mount
-                      
+      def stack_of(name)
+         stack = "stack.#{name}"
+         if has?(stack)
+           get(stack)
+         else
+           set stack, (a = [])
+           a
+         end
+      end
+      
+      
+      def get_local(name)
+        local = "local.#{name}"
+        return get local if has?(local)  
+        add local
+        get local
+      end
+      
+      def set_local(name, val)
+        local = "local.#{name}"
+        set local, val
+        val
+      end
+      
+      def push_local(name, newval = add)
+        local = "local.#{name}"
+        stack_of(local).push get local
+        set local, newval
+        newval
+      end    
+      
+      def pop_local(name)
+        local = "local.#{name}"
+        r = get local
+        set local, stack_of(local).pop
+        r
+      end
       
         
+      export_commands :set, :go!,    :add,               :create,
+                      :get, :stream, :append,  :stream_generate,
+                      :get_local, :set_local, :push_local, :pop_local, :delete
+                      
   end
-  
+    module Commands
+        def context(obj, ctxt = Ua::Application.top.context, &b)
+          Ua::Application.push(Ua::Application::ArgVoid, 
+                               ctxt,   
+                               self
+                              )
+          Ua::Application.top_app.context(obj, ctxt, &b)
+        ensure
+          Ua::Application.pop
+        end
+        alias model add
+        alias view context
+        alias link stream
+        alias new create        
+      end            
   
 end
 
+
+require 'ua/uadb'
+require 'ua/util'
 if !(Ua.const_get(:NoConflict) rescue nil)
   include Ua::Commands
+  include Ua::Util
 end

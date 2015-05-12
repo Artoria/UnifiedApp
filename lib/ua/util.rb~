@@ -1,0 +1,37 @@
+module Ua
+	module Util
+		class Helper
+			def initialize(obj)
+				@obj = obj
+			end
+
+			def [](*args)
+				if args.size == 1
+					obj[args[0]]
+				else
+					args.map{|x| obj[x]}
+				end
+			end
+
+			alias values_at []
+
+			def []=(*args)
+				last = args.pop
+				args.zip(last).each{|k|
+					a,b = k
+					@obj[a] = b
+				}
+			end
+			
+			
+		end
+		def ua(obj_or_str)
+			if Ua::UAClass === obj_or_str
+				return Helper.new(obj_or_str)
+			elsif String === obj_or_str
+				return Helper.new(Ua::Application.top_app.get(obj_or_str))
+			end
+			raise "Don't know how to make ua from #{obj_or_str}"
+		end
+	end
+end
