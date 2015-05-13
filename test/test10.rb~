@@ -39,7 +39,6 @@ end
 calc = lambda{|a, op, b|
   view(a).send(op, view(b))
 }
-
 forall [:atom, :+, :atom2] => :expr, &calc 
 forall [:atom, :-, :atom2] => :expr, &calc
 forall [:atom, :*, :atom2] => :expr, &calc

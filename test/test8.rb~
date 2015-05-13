@@ -26,7 +26,7 @@ forall [:tagname, :id] => :htmlelement do |tagname, id|
 end 
 
 x = modelhash\
-       tagname: "jerry",
+       tagname: "Orzfly",
        id:      42
        
 puts view(x, :htmlelement)
