@@ -130,7 +130,7 @@ module Ua
 
       
       def output_by_context(a, b, c, acyclic = self.class.top.controller)
-        acyclic = {:tagacyclic => 1} if not (Hash === acyclic  && acyclic[:tagacyclic])
+        acyclic = {:tagacyclic => 1} if not Hash === acyclic  || !acyclic[:tagacyclic]
         self.class.push ArgVoid, ArgVoid, acyclic
         catch(:continue){
           return find_deduct(a, b, c, acyclic)
